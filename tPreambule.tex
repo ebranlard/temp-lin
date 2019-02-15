@@ -1,0 +1,360 @@
+\usepackage{ifpdf}
+\ifpdf
+	\usepackage{graphicx}
+	\usepackage{epstopdf} %don't forget the shell-escape command for pdflatex
+    \usepackage[colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red]{hyperref}
+\else
+	\usepackage{graphicx}
+    \usepackage[dvips,colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red]{hyperref}
+\fi
+\usepackage{type1cm}
+% \usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{stmaryrd} %[| |] \llbracket
+\usepackage{mhsetup}
+\usepackage{mathtools}
+\usepackage{relsize}
+\usepackage{color} 
+\usepackage{cases}  
+\usepackage{fancybox}
+% \usepackage{subfig}  % does not work with jpconf
+\usepackage{subcaption}  % does not work with jpconf
+\usepackage[table]{xcolor}   %lots of tools for colors
+\usepackage{arydshln} % dash line in arrays: ``:'' in table cols, \hdashline and \cdashline
+\usepackage{blkarray} % for block arrays (e.g. labelling matrices)
+\usepackage{import}
+\usepackage{listings} % for  lstlistings
+
+\hypersetup{
+    colorlinks = false,
+    linkcolor =[rgb]{0.2,0.2,0.2},
+    linkbordercolor =[rgb]{0.7,0.7,0.7}
+}
+
+% --------------------------------------------------------------------------------}
+% --- CODE 
+% --------------------------------------------------------------------------------{
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{myblue}{HTML}{00007b}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\definecolor{myred}{HTML}{7b0000}
+
+\renewcommand{\tt}[1]{\texttt{#1}}
+
+% TODO TODO TOD, setting from my book are better
+\lstset{ %
+  basicstyle=\footnotesize\ttfamily,        % the size of the fonts that are used for the code
+  breakatwhitespace=true,          % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  frame=single,	                   % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  language=Pascal,                 % the language of the code
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=false,          % underline spaces within strings only
+  showtabs=false,                  % show tabs within strings adding particular underscores
+  tabsize=2,	                   % sets default tabsize to 2 spaces
+  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
+  commentstyle=\color{mygreen},    % comment style
+  keywordstyle=\bf\color{myblue},       % keyword style
+  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
+  stringstyle=\color{mymauve},     % string literal style
+  basicstyle=\footnotesize\ttfamily, % tiny,scriptsize,footnotesize,small
+}
+
+\newcommand{\pascal}{%
+\lstset{%
+    language=pascal,
+    morekeywords={unit,uses,raise,try,except,implementation},
+    morecomment=[l]{//}}%
+}
+\newcommand{\matlab}{%
+\lstset{%
+    language=matlab,
+    morekeywords={interp1} }
+}
+\newcommand{\fortran}{%
+\lstset{%
+    language=fortran,%
+    literate= {\%}{{{\color{myblue}\%}}}1,
+    morekeywords={interp1},
+    keywordstyle = [2]{\color{myred}}, % teal
+    morekeywords = [2]{CtrlOffset},
+}
+}
+%    literate={{(}{{\CodeSymbol{(}}}},
+% \lstdefinestyle{mystyle}
+% {
+%     language = C++,
+%     basicstyle = {\ttfamily \color{main-color}},
+%     backgroundcolor = {\color{back-color}},
+%     stringstyle = {\color{string-color}},
+%     keywordstyle = {\color{key-color}},
+%     keywordstyle = [2]{\color{lime}},
+%     keywordstyle = [3]{\color{yellow}},
+%     keywordstyle = [4]{\color{teal}},
+%     otherkeywords = {;,<<,>>,++},
+%     morekeywords = [2]{;},
+%     morekeywords = [3]{<<, >>},
+%     morekeywords = [4]{++},
+% }
+% 
+
+% --------------------------------------------------------------------------------}
+% --- FIGURES 
+% --------------------------------------------------------------------------------{
+\DeclareGraphicsExtensions{.pdf,.PDF,.png,.jpg,.PNG,.JPG,.eps,.EPS,.Eps}
+\graphicspath{{figs/}{figs_svg/}{figs_raw/}}
+% --- svgtex
+\newcommand{\svgtex}[4]{\begin{figure}[!htbp]%
+ \centering%
+ \def\svgwidth{#3\columnwidth}% used to be a scalebox
+ \scalebox{#4}{\import{figs_svgtex/}{#1}}%
+ \caption{#2}\label{fig:#1}%
+ \end{figure}%
+}
+% --- svg
+\newcommand{\svg}[3]{\begin{figure}[!htbp]
+ \centering%
+ \includegraphics[width=#3\textwidth]{#1}
+ \caption{#2}\label{fig:#1}
+ \end{figure}
+}
+% --- fig
+\newcommand{\fig}[3]{\begin{figure}[!htbp]
+ \centering%
+ \includegraphics[width=#3\textwidth]{#1}
+ \caption{#2}\label{fig:#1}
+ \end{figure}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Ensembles
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\zz}{\emptyset}
+\newcommand{\0}{\emptyset}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% vectors and matrix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\renewcommand{\v}[1]{\overrightarrow{ \boldsymbol{ #1 } }}
+% \renewcommand{\v}[1]{\underline{ #1 } }
+%\renewcommand{\v}[1]{\overrightarrow{  #1  }}
+%	\mathbf{#1} \boldsymbol{#1}
+\renewcommand{\v}[1]{\boldsymbol{#1}}
+\newcommand{\vv}[1]{\underline{ #1 } }
+% \newcommand{\m}[1]{\underline{\underline{\boldsymbol{#1}}}}
+% \newcommand{\m}[1]{\underline{\underline{\boldsymbol{#1}}}}
+\newcommand{\mm}[1]{\boldsymbol{#1}}
+\newcommand{\m}[1]{\boldsymbol{#1}}
+\newcommand{\mrm}[1]{\boldsymbol{\mathrm{#1}}}
+\def\identit{\hspace{0.08em}\makebox[5pt][c]{l\hspace{-0.55em}1}}
+%\newcommand{\identit}{\ensuremath{\mathbbm{1}}}
+
+\newcommand{\insys}[2]{\left.{#2}\right|_{{#1}}}  % in system 1
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Operators
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\DeclareMathOperator{\esssup}{ess\,sup}
+\DeclareMathOperator{\atan}{atan}
+\DeclareMathOperator{\asin}{asin}
+\DeclareMathOperator{\acos}{acos}
+\DeclareMathOperator{\sinc}{sinc}
+% \DeclareMathOperator{\tr}{tr}
+\renewcommand{\Re}{\operatorname{Re}}
+\renewcommand{\Im}{\operatorname{Im}}
+\DeclareMathOperator{\fft}{fft}
+% \renewcommand{\d}{\mathrm{d}}
+\renewcommand{\d}{\mathrm{d}}
+\newcommand{\dr}{\d{r}}
+\newcommand{\dm}{\d{m}}
+\newcommand{\dt}{\d{t}}
+\newcommand{\dA}{\d{A}}
+\newcommand{\dQ}{\d{Q}}
+\newcommand{\dT}{\d{T}}
+\newcommand{\dP}{\d{P}}
+% \newcommand{\stimes}{{\times}}
+% \newcommand{\scdot}{{\cdot}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Wind energy notations 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\MT}{\ensuremath{\text{MT}}}
+\newcommand{\BET}{\ensuremath{\text{BT}}}
+\newcommand{\KJ}{\ensuremath{\text{KJ}}}
+\newcommand{\LOD}{\upvarepsilon_{\mathsmaller{l\!/\!d}}}
+\newcommand{\CTloc}{\ensuremath{C_{T_r}}}
+\newcommand{\CPloc}{\ensuremath{C_{P_r}}}
+\newcommand{\CQloc}{\ensuremath{C_{Q_r}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Meca flu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\up}{\v{u}^{\!\mathsmaller{+}}} %fluid velocity
+\newcommand{\um}{\v{u}^{\!\mathsmaller{-}}} %fluid velocity
+\newcommand{\V}{\v{V}} %fluid velocity
+\newcommand{\om}{\v{\omega}} %fluid velocity
+\newcommand{\ve}{\v{v}} %fluid velocity
+\newcommand{\D}{{\Omega(t)}} %domain
+\newcommand{\dD}{{\partial\Omega(t)}} %frontier
+\newcommand{\dl}{\,{\d}l}
+\newcommand{\dS}{\,{\d}S}
+\newcommand{\dv}{\,{\d}v}
+\DeclareMathOperator{\grad}{grad}
+\DeclareMathOperator{\gradv}{\grad}
+\newcommand{\gradd}[1]{\v{\grad}\,#1}
+\DeclareMathOperator{\rot}{curl}
+\newcommand{\nab}{\nabla\!}
+\DeclareMathOperator{\nabb}{\underline{\underline{\nabla}}}
+\renewcommand{\div}{\operatorname{div}}
+\newcommand{\dpart}[1]{\frac{d#1}{dt}}
+\newcommand{\dfix}[1]{\frac{\partial #1}{\partial t}}
+\newcommand{\dmob}[2]{\left.\frac{\delta #2}{\delta t}\right|_{#1}}
+\newcommand{\dpx}[1]{\frac{\partial#1}{\partial x}}
+\newcommand{\dpy}[1]{\frac{\partial#1}{\partial y}}
+\newcommand{\dpz}[1]{\frac{\partial#1}{\partial z}}
+\newcommand{\dpr}[1]{\frac{\partial#1}{\partial r}}
+\newcommand{\dpt}[1]{\frac{\partial#1}{\partial \theta}}
+\newcommand{\disc}[1]{\left\llbracket#1\right\rrbracket}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Relations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\overArrow[2][=]{\stackrel{\overset{\makebox[0pt]{\text{#2}}}{\uparrow}}{#1}}
+\renewcommand{\eqref}[1]{\overArrow[=]{\scriptsize\ref{#1}}} 
+\newcommand{\eqtext}[1]{\overArrow[=]{\scriptsize\text{#1}}} 
+%\newcommand{\eqdef}{\stackrel{\mathrm{def}}{=}}
+% \newcommand{\eqdef}{  \stackrel{\wedge}{=}} %equal per definition
+\newcommand{\eqdef}{\stackrel{\mathsmaller{\mathsmaller{\mathsmaller{\triangle}}}}{=}} 
+\newcommand{\eqapprox}{  \stackrel{\sim}{=}} %equal per definition
+\newcommand{\equivalent}[1]{\underset{#1}{\sim}} %equivalence at #1
+\newcommand{\tends}[1]{\xrightarrow[#1]{}}  %tends to, when #1
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% fractions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\dfrac}[2]{{\displaystyle \frac{#1}{#2}}}
+%\renewcommand{\tfrac}[2]{{\ensuremath{\textstyle \frac{#1}{#
+\renewcommand{\tfrac}[2]{{\ensuremath{#1/#2}}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Norms
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\providecommand{\abs}[1]{\lvert#1\rvert}
+\providecommand{\norm}[1]{\lVert#1\rVert}
+
+% --------------------------------------------------------------------------------}
+% ---  
+% --------------------------------------------------------------------------------{
+% Matrices
+\newcommand{\M} {{\m{M}}}
+\newcommand{\Mrm} {{\m{\mathrm{M}}}}
+\newcommand{\Mrmdot} {{\m{\dot{\mathrm{M}}}}}
+\newcommand{\K} {{\m{K}}}
+\newcommand{\Jt}{\m{B}_\theta}
+\newcommand{\Jx}{\m{B}_x}
+\newcommand{\Jxhat}{\m{\hat{B}}_x}
+\newcommand{\Jthat}{\m{\hat{B}}_\theta}
+\newcommand{\Jxtil}{\m{\tilde{B}}_x}
+\newcommand{\Jttil}{\m{\tilde{B}}_\theta}
+\newcommand{\J} {\mrm{B}}
+\newcommand{\Jdot}{\mrm{\dot{B}}}
+\newcommand{\R}{\m{R}}
+\newcommand{\Rrm}{\m{\mathrm{R}}}
+% Vector Variables
+\renewcommand{\r}{\v{r}}
+\renewcommand{\u}{\v{u}}
+\newcommand{\q}{\v{\mathrm{q}}}
+\newcommand{\g}{\v{g}}
+\newcommand{\U}{\v{U}}
+\newcommand{\n}{\v{n}}
+\newcommand{\x}{\v{x}}
+\newcommand{\xrm}  {\v{\mathrm{x}}}
+\newcommand{\vrm}  {\v{\mathrm{v}}}
+\newcommand{\vrmdot}{\v{\dot{\mathrm{v}}}}
+\newcommand{\arm}  {\v{\mathrm{a}}}
+\newcommand{\frm}  {\v{\mathrm{f}}}
+\newcommand{\qdot} {\v{\dot{\mathrm{q}}}}
+\newcommand{\gdot} {\v{\dot{g}}}
+\newcommand{\xdot} {\v{\dot{x}}}
+\newcommand{\rdot} {\v{\dot{r}}}
+\newcommand{\udot} {\v{\dot{u}}}
+\newcommand{\vdot} {\v{\dot{v}}}
+\newcommand{\omdot}{\v{\dot{\omega}}}
+\newcommand{\xrmdot}{\v{\dot{\mathrm{x}}}}
+\newcommand{\qddot}{\v{\ddot{\mathrm{q}}}}
+\newcommand{\gddot}{\v{\ddot{g}}}
+\newcommand{\xddot}{\v{\ddot{x}}}
+\newcommand{\uddot}{\v{\ddot{u}}}
+\newcommand{\vddot}{\v{\ddot{v}}}
+\newcommand{\rddot}{\v{\ddot{r}}}
+\newcommand{\xrmddot}{\v{\ddot{\mathrm{x}}}}
+\renewcommand{\r}{\v{r}}
+\newcommand{\s}{\v{s}}
+\newcommand{\ddt}[1]{\frac{d#1}{dt}}
+\newcommand{\ddx}[1]{\frac{d#1}{dx}}
+\newcommand{\mphi}{\m{\Phi}}
+% \newcommand{\om}{\v{\omega}}
+\newcommand{\omtil} {\m{\tilde{\omega}}}
+\newcommand{\omptil}{\m{\tilde{\omega'}}}
+\newcommand{\rtil}  {\m{\tilde{r}}}
+\newcommand{\stil}  {\m{\tilde{s}}}
+\newcommand{\rhotil}{\m{\tilde{\rho}}}
+\newcommand{\rhoptil}{\m{\tilde{{\rho'}}}}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Misc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\lbar}{\overline}
+\renewcommand{\bar}{\overline}
+\renewcommand{\deg}{\ensuremath{^\circ}}
+\renewcommand{\dim}[1]{\rlap{\ensuremath{\qquad\text{[ #1 ]}}}}
+\newcommand{\cst}{\text{cst}}
+\newcommand{\AR}{\ensuremath{\text{A\!R}}}
+\mathchardef\mhyphen="2D   % Needs amsmath
+
+
+\newcommand{\omAB}[2]{\v{\omega}\left(\frac{#1}{#2}\right)}
+
+\newcommand{\Fg}{\ensuremath{\v{F\!_g}}}
+\newcommand{\GF}{\ensuremath{\v{\mathrm{G}\!\mathrm{F}}}}
+\newcommand{\GM}{\ensuremath{   \mathrm{G}\!\mathrm{M}}}
+\newcommand{\GO}{\ensuremath{   \mathrm{G}\!\mathrm{\omega}}}
+\newcommand{\GXI}{\ensuremath{  \mathrm{G}\!\mathrm{\xi}}}
+\newcommand{\GD}{\ensuremath{   \mathrm{G}\!\mathrm{D}}}
+\newcommand{\GK}{\ensuremath{   \mathrm{G}\!\mathrm{K}}}
+\newcommand{\GZ}{\ensuremath{   \mathrm{G}\!\mathrm{Z}}}
+\newcommand{\GX}{\ensuremath{   \mathrm{G}\!\mathrm{X}}}
+\newcommand{\Xg}{\ensuremath{\v{X\!_g}}}
+\newcommand{\dXg}{\ensuremath{\v{\dot{X\!_g}}}}
+\newcommand{\ddXg}{\ensuremath{\v{\ddot{X\!_g}}}}
+
+
+\newcommand{\weird}[1]{{\color{red}{!!!#1!!!}}}
+\newcommand{\myquote}[1]{Quote: {\color{red}{#1}}}
+\newcommand{\todo}[1]{{\colorbox{yellow}{TODO:}} #1\colorbox{yellow}{/}}
+
+\newcommand\runinhead[1]{\par\vspace{0.3cm}\noindent\textbf{#1}\ }%
+
+\setcounter{tocdepth}{2}     % Profondeur table des matiere
+% \setcounter{tocdepth}{3}
+% \linespread{2}\selectfont
+
+% --------------------------------------------------------------------------------}
+% --- Spacing 
+% --------------------------------------------------------------------------------{
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+% --------------------------------------------------------------------------------}
+% --- INDEX  
+% --------------------------------------------------------------------------------{
+\newcommand{\indexdef}[1]{\textit{#1}\index{#1}}%
+\newcommand{\indexme}[1]{\textit{#1}\index{#1}}% same as indexdef
