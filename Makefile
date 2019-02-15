@@ -6,3 +6,4 @@ pdf:
 diff:
 	latexdiff $(MAIN)_old.tex $(MAIN).tex > $(MAIN)-diff.tex
 	pdflatex --shell-escape --interaction=nonstopmode $(MAIN)-diff.tex
+	pdflatex --shell-escape --interaction=nonstopmode $(MAIN)-diff.tex

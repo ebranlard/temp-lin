@@ -1,0 +1,13 @@
+*.pdf
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.synctex.gz
+figs_svg/*
+figs_svgtex/*
+figs/
+make.exe
+
