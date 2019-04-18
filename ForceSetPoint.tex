@@ -43,7 +43,7 @@ The basic workflow is listed below. More details follow in subsequent sections.
     \begin{itemize}\tightlist
     \item At each time step, if the controller trimming is active, \textit{ServoDyn} updates its controller offset state (\tt{CtrlOffset}) based on the proportional gain \tt{TrimGain} and the error in rotational speed. This offset is added to the controller commands of \textit{ServoDyn} and will hence have an influence on \tt{ElastoDyn}. 
     \item At each time step, the glue-code adds additional damping, via external forces, to the structure of the modules \textit{ElastoDyn} and \textit{BeamDyn}.
-    \item At given azimuthal positions (defined by \tt{NAzimStep}), the glue-code computes the relative difference between the output vector of the current revolution and the previous revolution. If the rotational speed is zero, the difference is computed between two successive time steps and the number of azimuthal step is effectively `.
+    \item At given azimuthal positions (defined by \tt{NAzimStep}), the glue-code computes the relative difference between the output vector of the current revolution and the previous revolution. If the rotational speed is zero, the difference is computed between two successive time steps and the number of azimuthal step is effectively 1.
     \item When this difference is below the tolerance \tt{TrimTol} for all the reference azimuthal positions, the simulation has reached a periodic steady state, which also implies that the controller offset parameter has also converged and the rotational speed of the rotor matches the requested set-point. The time-stepping is stopped
     \end{itemize}
     \item  The linearization is performed for one rotor revolution (if applicable) at steps of \tt{NAzimStep}. The operating point is at the requested rotational speed and it uses the controller offset obtained by the iteration procedure above.
@@ -158,7 +158,8 @@ The following steps make up the iterative procedure:
 %       The output vector is stored for each target azimuthal position $\v{\psi}_0$. 
       For each time step:
         \begin{itemize}\tightlist
-            \item Call the time step integration routine \tt{FAST\_Solution\_T}. If the rotational speed is none zero and if the generator is on, this routine applies an increased damping (based on \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp}, see \autoref{sec:damping}) and applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
+            \item Call the time step integration routine \tt{FAST\_Solution\_T}. This routine applies an increased damping (based on \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp}, see \autoref{sec:damping})
+   If the rotational speed is none zero and if the generator is on, \textit{ServoDyn} applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
             \item Store the current azimuthal angle and output vector: $\psi_{c}$ and $\v{y}_c$
 %             \item Store the current output vector from all the modules $\v{y}_\text{c}$
             \item If $t=0$ (or first time step):
