@@ -321,7 +321,7 @@ The error in rotor speed $\epsilon_\Omega$ is the difference between the target 
         \begin{align}
             \epsilon_\Omega ={\Omega_c - \Omega_\text{ref}}
         \end{align}
-The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$.
+The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$ where \tt{u} is defined at time \tt{t} (i.e., not \tt{t+1}).
         The offset on the controller variable is computed using 
         the speed error and a proportional gain $k_p>0$. The offset is computed as:
         \begin{align}
@@ -342,9 +342,9 @@ This issue will be addressed in the next paragraph.
 The update of the discrete state is implemented as follows:
 \begin{lstlisting}
 if ((TrimCase==2).or.(TrimCase==3)) then
-    xd%CtrlOffset += (u\%RotSpeed - p%RotSpeedRef) * TrimGain 
+    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * p%TrimGain 
 else if ((TrimCase==1) then
-    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * sign(TrimGain, p%YawNeutr + xd%CtrlOffset)
+    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * sign(p%TrimGain, p%YawNeut + xd%CtrlOffset)
 else
     xd%CtrlOffset = 0
 endif
@@ -355,11 +355,11 @@ endif
 
 \paragraph{Output routine \tt{SrvD\_CalcOutput}}
 The output variables of \textit{ServoDyn} are directly modified using the offset \tt{CtrlOffset}.
-As mentioned in the previous paragraph, in the yaw case, the main variable outputted by \textit{ServoDyn} is the yaw moment and not the yaw angle. The part of the yaw moment that depends on the yaw angle is computed as:
+As mentioned in the previous paragraph, in the yaw case, the main variable output by \textit{ServoDyn} is the yaw moment and not the yaw angle. The part of the yaw moment that depends on the yaw angle is computed as:
 \begin{align}
     Q_\text{yaw}= - k_\text{yaw} ( \theta_\text{yaw,ED} - \theta_{\text{yaw},0})
 \end{align}
-Hence, if $\theta_{\text{yaw},0}$ is replaced by  $\theta_{\text{yaw},0}+x_\text{off}$, it is seen that the yaw moment is given the offset $k_\text{yaw} x_\text{off}$.
+Hence, if $\theta_{\text{yaw},0}$ is replaced by $\theta_{\text{yaw},0}+x_\text{off}$, it is seen that the yaw moment is given the offset $k_\text{yaw} x_\text{off}$.
 % 
 % 
 For the implementation, the control outputs are trimmed just after their computation within the  \tt{SrvD\_CalcOutput} routine, that is after calling \tt{Pitch\_CalcOutput}, \tt{Torque\_CalcOutput} and \tt{Yaw\_CalcOutput}, as follows:
