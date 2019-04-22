@@ -17,7 +17,7 @@
 
 \section*{Introduction}
 This document describes the implementation of an algorithm to perform %close-loop
-linearization about a rotational set-point in \textit{OpenFAST}. Currently, the user needs to manually adjust operating parameters until the desired rotational speed is reached, or until the transient are eliminated, before the linearization can be performed. This procedure is here automatized using a simple iterative algorithm. The method supports simulations with zero rotational speed, a fixed rotational speed (generator off), or simulations with a variable speed (generator on). In the later case, the algorithm presented adjusts one of the following operating parameter to reach the target rotational speed: the blade pitch angle, the generator torque or the neutral yaw position of the turbine. A proportional gain on the rotational speed error is used to adjust the parameters. To speed-up the convergence, the damping may be artificially increased in the iteration step. At the end of the iteration algorithm, the transient have dissipated, the rotor is at the target rotational speed and a steady or periodic operating point is reached. The linearization is then performed for one rotor revolution (if applicable) without the previously added damping.
+linearization about a rotational set-point in \textit{OpenFAST}. Currently, the user needs to manually adjust operating parameters until the desired rotational speed is reached, or until the transients are eliminated, before the linearization can be performed. This procedure is here automatized using a simple iterative algorithm. The method supports simulations with zero rotational speed, a fixed rotational speed (generator off), or simulations with a variable speed (generator on). In the later case, the algorithm presented adjusts one of the following operating parameter to reach the target rotational speed: the blade pitch angle, the generator torque or the neutral yaw position of the turbine. A proportional gain on the rotational speed error is used to adjust the parameters. To speed-up the convergence, the damping may be artificially increased in the iteration step. At the end of the iteration algorithm, the transients have dissipated, the rotor is at the target rotational speed and a steady or periodic operating point is reached. The linearization is then performed for one rotor revolution (if applicable) without the previously added damping.
 The algorithm is such that it only involves modifications of the \textit{OpenFAST} glue-code and of \tt{ServoDyn}.
 
 
@@ -28,7 +28,7 @@ The algorithm is such that it only involves modifications of the \textit{OpenFAS
 The basic workflow is listed below. More details follow in subsequent sections.
 \begin{itemize}\tightlist
     \item New parameters are read from the input files (given in \autoref{sec:newinputs})
-    \item If the parameter \tt{CalcSteady} is false, \textit{OpenFAST} the linearization process will happen as before (at LinTimes)
+    \item If the parameter \tt{CalcSteady} is false, the \textit{OpenFAST} linearization process will happen as before (at \tt{LinTimes})
     \item 
       If \tt{CalcSteady} is true, \textit{OpenFAST} will iterate and update a controller parameter
       until the rotational speed matches the parameter \tt{RotSpeed} given in \textit{ElastoDyn}'s input file, and then perform the linearization at this periodic operating point.
@@ -41,7 +41,7 @@ The basic workflow is listed below. More details follow in subsequent sections.
     \item \textit{ServoDyn} is initialized. The discrete-time state \tt{CtrlOffset} is added to the module to keep track of the controller parameter offset.
     \item The glue-code starts a special time stepping loop where a convergence criteria is checked upon after each revolution, or time step if the rotational speed is zero.  The time stepping loop has the following characteristics:
     \begin{itemize}\tightlist
-    \item At each time step, if the controller trimming is active, \textit{ServoDyn} updates its controller offset state (\tt{CtrlOffset}) based on the proportional gain \tt{TrimGain} and the error in rotational speed. This offset is added to the controller commands of \textit{ServoDyn} and will hence have an influence on \tt{ElastoDyn}. 
+    \item At each time step, if the controller trimming is active, \textit{ServoDyn} updates its controller offset state (\tt{CtrlOffset}) based on the proportional gain \tt{TrimGain} and the error in rotational speed. This offset is added to the controller commands of \textit{ServoDyn} and will hence have an influence on \textit{ElastoDyn}. 
     \item At each time step, the glue-code adds additional damping, via external forces, to the structure of the modules \textit{ElastoDyn} and \textit{BeamDyn}.
     \item At given azimuthal positions (defined by \tt{NAzimStep}), the glue-code computes the relative difference between the output vector of the current revolution and the previous revolution. If the rotational speed is zero, the difference is computed between two successive time steps and the number of azimuthal step is effectively 1.
     \item When this difference is below the tolerance \tt{TrimTol} for all the reference azimuthal positions, the simulation has reached a periodic steady state, which also implies that the controller offset parameter has also converged and the rotational speed of the rotor matches the requested set-point. The time-stepping is stopped
@@ -53,9 +53,10 @@ The basic workflow is listed below. More details follow in subsequent sections.
 The following sections describe the changes needed to the code:
 \begin{itemize}
     \item \autoref{sec:newinputs}: new input parameters to be added to the \textit{OpenFAST} glue-code
+    \item \autoref{sec:newEDinitoutputs}: changes to \textit{ElastoDyn} to return needed information
     \item \autoref{sec:gluecodeiterative}: iterative procedure of the glue-code to ensure a periodic steady state is reached
-    \item \autoref{sec:damping}: glue-code procedure to increase the damping and accelerate the convergence
     \item \autoref{sec:changesservodyn}: changes to \textit{ServoDyn} to compute the controller parameter offset
+    \item \autoref{sec:damping}: glue-code procedure to increase the damping and accelerate the convergence
 \end{itemize}
 
 
@@ -75,23 +76,41 @@ The following input are added to the main \textit{OpenFAST} input file (\tt{.fst
 \begin{itemize}\tightlist
     \item \tt{CalcSteady - Calculate a steady-state periodic operating point before linearization (-) (switch)}
     \item \tt{TrimCase   - Controller parameter to be trimmed \{1:yaw; 2:torque; 3:pitch\} [used only if CalcSteady=True]}
-    \item \tt{TrimTol    - Tolerance for the rotational speed convergence [>0] [used only when CalcSteady=True] }
+    \item \tt{TrimTol    - Tolerance for the rotational speed convergence [>eps] [used only when CalcSteady=True] }
     \item \tt{TrimGain    - Proportional gain for the rotational speed error (rad/(rad/s) or Nm/(rad/s)) [>0] [used only when CalcSteady=True] }
     \item \tt{Twr\_Kdmp   - Damping factor for the tower (N/(m/s)) [>=0] [used only when CalcSteady=True] }
     \item \tt{Bld\_Kdmp  - Damping factor for the blade (N/(m/s)) [>=0] [used only when CalcSteady=True] }
-    \item \tt{NAzimStep  - Number of equally-spaced azimuth steps in periodic linearized model (-) [>=1] }
+%    \item \tt{NAzimStep  - Number of equally-spaced azimuth steps in periodic linearized model (-) [>=1] }
 \end{itemize}
+
+Note: \tt{NAzimStep} is equivalent to \tt{NLinTimes}, which is already in the \textit{OpenFAST} input file. Also note that in implementation,
+\tt{TrimTol} must be larger than epsilon. \question{or maybe we should require it to be even larger?}
+
 \question{Do we want to adjust more damping values?}
-Linearization inputs are read in \tt{Fast\_Subs.f90}, routine \tt{FAST\_ReadPrimaryFile} about line 2273. They are returned in the structure named \tt{p} or \tt{p\_FAST} of type \tt{FAST\_ParameterType}. The parameters above needs to be added to the \tt{FAST\_Registry.txt} file as \tt{FAST\_ParameterType}.
+Linearization inputs are read in \tt{Fast\_Subs.f90}, routine \tt{FAST\_ReadPrimaryFile} about line 2273. They are returned in the structure named \tt{p} or \tt{p\_FAST} of type \tt{FAST\_ParameterType}. The parameters above need to be added to the \tt{FAST\_Registry.txt} file as \tt{FAST\_ParameterType}.
 % \clearpage
 
 
 
 
 
+\subsection{New initialization outputs from \textit{ElastoDyn}}
+\label{sec:newEDinitoutputs}
 
+\paragraph{New registry types}
+The initialization outputs \tt{RotSpeed} and \tt{isFixed\_GenDOF} are added: 
+\fortran
+\begin{lstlisting}
+InitOutputType  ReKi     RotSpeed       - - - "Initial or fixed rotor speed" rad/s
+InitOutputType  Logical  isFixed\_GenDOF - - - "Whether the generator DOF is fixed (true) or free (false)" -
+\end{lstlisting}
 
+These variables are sent to the initialization routine of the \textit{ServoDyn} module.
 
+Note: We can't use the \textit{ElastoDyn} output type to initialize \textit{ServoDyn} because the 
+initialization routines do not calculate output variables (only the values defining the output meshes are
+required to be initialized in the output type). The only exception to this is textit{BeamDyn}, and 
+that is due to an issue in the order-dependent coupling algorithm.
 
 
 \subsection{Main glue-code procedure}
@@ -126,11 +145,14 @@ $\v{\psi}_0$ & $1\times \tt{NAzimStep}$ & Target azimuthal positions $\v{\psi}_0
 $\v{y}_c$ & $1\times n_y$ & Output vector (from all modules) at current time step \\
 $\v{y}_p$ & $1\times n_y$ & Output vector (from all modules) at previous time step \\
 $\v{y}_0$ & $1\times n_y$ & Output vector interpolated at a target azimuthal position \\
-$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector at each target azimuthal position $\psi_y$ \\
+$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector at each target azimuthal position $\psi_0[j]$ \\
 $\v{\epsilon}_y$ & $1 \times \tt{NAzimStep}$ & Relative error in the output vector between two revolutions at the same target azimuthal position \\
 \hline
 \end{tabular}
 \end{table}
+
+Note: The outputs include all of the outputs used in the linearization equations, with the exception of \tt{WriteOutput} values.
+\textit{MAP++} also includes a variable called \\tt{wrtOutput}, which should also be excluded.
 
 The following steps make up the iterative procedure:
 \begin{itemize}\tightlist
@@ -159,7 +181,7 @@ The following steps make up the iterative procedure:
       For each time step:
         \begin{itemize}\tightlist
             \item Call the time step integration routine \tt{FAST\_Solution\_T}. This routine applies an increased damping (based on \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp}, see \autoref{sec:damping})
-   If the rotational speed is none zero and if the generator is on, \textit{ServoDyn} applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
+   If the rotational speed is non-zero and if the generator is on, \textit{ServoDyn} applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
             \item Store the current azimuthal angle and output vector: $\psi_{c}$ and $\v{y}_c$
 %             \item Store the current output vector from all the modules $\v{y}_\text{c}$
             \item If $t=0$ (or first time step):
@@ -167,15 +189,15 @@ The following steps make up the iterative procedure:
 %                     \item Set the reference rotor speed as $\Omega_\text{ref}=\Omega_c$
 %                     \item If $\Omega_\text{ref}=0$, exit the trimming algorithm
                     \item Set the initial azimuthal position as $\psi_\text{init}=\psi_c$
-                        The azimuthal angle is stored as a number in the interval $[0;\, 2\pi [$ ($2\pi$ excluded), i.e. $\psi_c=\operatorname{mod}(\psi, 2\pi)$, implemented as $\psi_c$=\tt{Zero2TwoPi($\psi$)}.
-                    \item Set the vector of target azimuthal positions $\v{\psi}_0$ (also in $[0;\,2\pi[$):
+                        The azimuthal angle is stored as a number in the interval $[0;\, 2\pi )$ ($2\pi$ excluded), i.e. $\psi_c=\operatorname{mod}(\psi, 2\pi)$, implemented as $\psi_c$=\tt{Zero2TwoPi($\psi$)}.
+                    \item Set the vector of target azimuthal positions $\v{\psi}_0$ (also in $[0;\,2\pi)$):
                             \begin{align}
                                  k=1..\tt{NAzimStep}
                                  ,\quad
                                  \v{\psi}_0[k] = \operatorname{mod}(\psi_\text{init} +  (k-1) \Delta\psi, 2\pi), \quad \Delta\psi\eqdef \frac{2\pi}{\tt{NAzimStep}}
                             \end{align}
 
-                    \item Set $\v{y}_p=\v{y}_c$ ans $\psi_p=\psi_c$
+                    \item Set $\v{y}_p=\v{y}_c$ and $\psi_p=\psi_c$
                 \end{itemize}
 %             \item Compute the error in rotor speed $\epsilon_\Omega$, the difference between the target speed and the current rotor speed:
 %                 \begin{align}
@@ -261,7 +283,7 @@ The inputs \tt{RotSpeedRef}, \tt{TrimCase}, \tt{TrimGain} are added:
 \begin{lstlisting}
 InitInputType	IntKi	TrimCase	-	-	-	"Controller parameter to be trimmed"	-
 InitInputType	ReKi	TrimGain	-	-	-	"Proportional gain on rotational speed error"	-
-InitInputType	ReKi	RotSpeedRef	-	-	-	"Reference rotational speed"	rad/s??
+InitInputType	ReKi	RotSpeedRef	-	-	-	"Reference rotational speed"	rad/s
 \end{lstlisting}
 These inputs should also be added as \tt{ParameterType} in the registry file.
 %          , \qquad
@@ -282,8 +304,9 @@ InitInData_SrvD%TrimCase    = p_FAST%TrimCase
 InitInData_SrvD%TrimGain    = p_FAST%TrimGain
 InitInData_SrvD%RotSpeedRef = ED%Output(1)%RotSpeed
 \end{lstlisting}
-If the generator degree of freedom is off or if the rotational speed is zero, \tt{TrimCase} is set to $0$ so that the trimming is cancelled.
-
+If the generator degree of freedom is off or if the rotational speed is zero, \tt{TrimCase} is set to $0$ so that the trimming is canceled.
+Note that this is done in the glue code prior to calling \textit{ServoDyn} (because \textit{ServoDyn} does not know any DOF information from
+the structural code).
 
 
 \paragraph{Initialization routine \tt{Srvd\_Init}}
@@ -320,7 +343,7 @@ The update of the discrete state is implemented as follows:
 \begin{lstlisting}
 if ((TrimCase==2).or.(TrimCase==3)) then
     xd%CtrlOffset += (u\%RotSpeed - p%RotSpeedRef) * TrimGain 
-else if ((TrimCase==3) then
+else if ((TrimCase==1) then
     xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * sign(TrimGain, p%YawNeutr + xd%CtrlOffset)
 else
     xd%CtrlOffset = 0
