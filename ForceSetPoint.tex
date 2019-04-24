@@ -390,14 +390,9 @@ It is important to note that the routines \tt{CalculateStandardYaw} and \tt{Calc
 % \weird{Torque\_CalcOutput, calls \tt{CalcuateTorque}, also called by \tt{Torque\_UpdateStates}}
 
 \paragraph{Linearization routine \tt{SrvD\_JacobianPInput}}
-This routine uses a generator torque which does not have an offset. 
-It may require the following modification:
-\begin{lstlisting}
-if (TrimCase==2)
-    GenTrq     = GenTrq      + xd%CtrlOffset
-endif
-\end{lstlisting}
-
+This routine computes the partial derivatives of outputs with respect to inputs. The \textit{ServoDyn} inputs in the linearization analysis
+include only \tt{Yaw}, \tt{YawRate}, and \tt{HSS\_Spd}. The modified output equations in \tt{SrvD\_CalcOutput} are not functions of 
+any of these variables, thus the partial derivatives are unchanged.
 
 % 
 % 
