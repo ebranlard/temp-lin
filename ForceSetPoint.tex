@@ -108,9 +108,8 @@ InitOutputType  Logical  isFixed_GenDOF - - - "Whether the generator DOF is fixe
 These variables are sent to the initialization routine of the \textit{ServoDyn} module.
 
 Note: We can't use the \textit{ElastoDyn} output type to initialize \textit{ServoDyn} because the 
-initialization routines do not calculate output variables (the values defining the output meshes are the only
-values required to be initialized in the output type). The only exception to this is \textit{BeamDyn}, and 
-that is due to an issue in the order-dependent coupling algorithm.
+initialization routines do not necessarily calculate output variables (the values defining the output meshes are the only
+values required to be initialized in the output type). The only exception to this is when \textit{BeamDyn} is used.
 
 
 \subsection{Main glue-code procedure}
@@ -146,18 +145,19 @@ The following storage variables are used by the iterative algorithm:
 \begin{tabular}{ccp{10cm}}
 \textbf{Variable} & \textbf{Dimensions}& \textbf{Description}\\
 \hline
-$\v{\psi}_0$ & $1\times \tt{NAzimStep}$ & Target azimuthal positions $\v{\psi}_0$, indexed with the variable $j$ \\
-$\v{y}_c$ & $1\times n_y$ & Output vector (from all modules) at current time step \\
-$\v{y}_p$ & $1\times n_y$ & Output vector (from all modules) at previous time step \\
-$\v{y}_0$ & $1\times n_y$ & Output vector interpolated at a target azimuthal position \\
-$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector at each target azimuthal position $\psi_0[j]$ \\
+$n_{rot}$ & $1 \times 1$ & Number of full rotor revolutions completed; if the reference rotational speed is zero, each time step is considered a full revolution.\\
+$j$ & $1 \times 1$ & Index into target azimuth positions, $j \in [1,\tt{NAzimStep}]$\\
+$n_y$ & $1 \times 1$ & Total number of outputs included in the linearization analysis of all modules, excluding any \tt{WriteOutput} and extended output values\\
+$\v{\psi}_0$ & $1\times \tt{NAzimStep}$ & Target azimuthal positions, $\v{\psi}_0[j] \in [0, 2\pi)$\\
+$\v{y}_c$ & $1\times n_y$ & Output vector (from all modules) at current time step (used for interpolation)\\
+$\v{y}_p$ & $1\times n_y$ & Output vector (from all modules) at previous time step (used for interpolation)\\
+$\v{y}_0$ & $1\times n_y$ & Output vector at a target azimuthal position, interpolated using $\v{y}_c$ and $\v{y}_p$\\
+$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector interpolated at each target azimuthal position $\psi_0[j]$ (stored from previous revolution)\\
 $\v{\epsilon}_y$ & $1 \times \tt{NAzimStep}$ & Relative error in the output vector between two revolutions at the same target azimuthal position \\
 \hline
 \end{tabular}
 \end{table}
 
-Note: The outputs include all of the outputs used in the linearization equations, with the exception of \tt{WriteOutput} values.
-\textit{MAP++} also includes a variable called \tt{wrtOutput}, which should also be excluded.
 
 The following steps make up the iterative procedure:
 \begin{itemize}\tightlist
@@ -210,19 +210,23 @@ The following steps make up the iterative procedure:
 %                 \end{align}
 %                 This error will be used at the next time step to correct the controller parameter
 
-            \item If $(\psi_c -\psi_p) \geq \Delta\psi$, return an error: the rotor is spinning too fast, the time step or \tt{NazimStep} are too large
+            \item If $t >0$ and $(\psi_c -\psi_p) \geq \Delta\psi$, return an error: the rotor is spinning too fast; the time step or \tt{NazimStep} are too large.
 
-            \item If $\psi_c \geq \psi_0[j]$
+            \item If $\psi_c \geq \psi_0[j]$ (take care with the $2 \pi$ boundary)
                 \begin{itemize}
                     \item Interpolate the output vector to the target azimuthal position $\psi_0[j]$ using the current output values $\v{y}_c$ and the previous ones $\v{y}_p$:
                         \begin{align}
                             \text{if $t=0$ or $\Omega_\text{ref}=0$} , \ 
-                            \v{y}_0 = \v{y}_p,
+                            \v{y}_0 = \v{y}_c,
                             \quad \text{else}\quad 
                             \v{y}_0 = \v{y}_p + (\v{y}_c-\v{y}_p)\frac{\psi_0[j]-\psi_p}{\psi_c-\psi_p}   %\label{eq:}
                         \end{align}
-                        Note: outputs that are 3D rotations should be transformed to logarithmic maps.\\
+                        Note: outputs that are 3D rotations should be transformed to logarithmic maps.
                         Note: special care is needed if angles are close to 0 or $2\pi$, in which case they should be taken between $-\pi$ and $\pi$.
+                        Note: The output interpolations will be performed by the auto-generated routines in the FAST Registry. I am implementing this to include using the extrap-interp order
+                              used in the FAST input file. In the case that the rotational speed is zero, the extrap-interp order for the CalcSteady algorithm is changed to 0 
+                              so it will use the current value. I also modified the FAST Registry and NWTC\_Library to handle interpolation and extrapolation of angles. \\
+
                     \item If $n_\text{rot}>0$, compute the mean squared relative error of the output vector at the azimuthal position $\psi_0[j]$ between the current revolution and the previous one:
                         \begin{align}
                             \epsilon_y^2[j] %=\rVert\boldsymbol{\epsilon_y}\lVert^2
@@ -252,14 +256,17 @@ The following steps make up the iterative procedure:
                         \item If converged, exit the time loop
                         \item Otherwise, compute a reference value for each of the index of the output vector, based on the maximum and minimum values taken over one rotor revolution.
                 \begin{align}
-                    y_{\text{ref}}[i] = \max(Y_0[:,i]) - \min(Y_0[:,i])
+                    y_{\text{ref}}[i] = \left| \max(Y_0[:,i]) - \min(Y_0[:,i]) \right|
                 \quad\text{if }\
                 y_\text{ref}[i]>10^{-6}
                 ,\quad\text{else }\
                 y_\text{ref}[i]=1
                 \label{eq:yref}
-                \end{align}
-                Set $j=1$ and continue the time stepping.
+                \end{align}                
+                \begin{align}
+                \text{For angles,} \quad y_{\text{ref}}[i] = \min(\pi,y_{\text{ref}}[i])
+                \end{align}                
+                \item Set $j=1$ and continue the time stepping.
             \end{itemize}
 
     \end{itemize}
@@ -267,7 +274,7 @@ The following steps make up the iterative procedure:
 \end{itemize}
 \paragraph{Linearization}
 \begin{itemize}
-\item The values \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp} are set to 0
+% \item The values \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp} are set to 0 % ignoring this due to added complication; damping should have almost no effect on the converged solution
 % \item The controller offset is kept to its value $p_\text{off}$
 \item The standard linearization procedure takes place
 \end{itemize}
@@ -335,7 +342,7 @@ The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$ where \tt{u} is defined a
 The variable $s$ above accounts for possible sign adjustments. 
 The offset is such that it will converge to a constant value as $\epsilon_\Omega$ tends to 0.
 When \tt{TrimCase}=1, $x_\text{off}$ is the yaw angle offset (in rad). 
-When \tt{TrimCase}=2, $x_\text{off}$ is the generator torque offset (in N). 
+When \tt{TrimCase}=2, $x_\text{off}$ is the generator torque offset (in Nm). 
 When \tt{TrimCase}=3, $x_\text{off}$ is the pitch angle offset (in rad). 
 % The offset 
 For the pitch and generator torque, $s=1$. Indeed, when the rotational speed is faster than $\Omega_\text{ref}$ ($\epsilon_\Omega>0)$, the  pitch or generator torque needs to be increased to lower the rotational speed. The opposite holds when the rotor spins slower than $\Omega_\text{ref}$.
