@@ -17,7 +17,7 @@
 
 \section*{Introduction}
 This document describes the implementation of an algorithm to perform %close-loop
-linearization about a rotational set-point in \textit{OpenFAST}. Currently, the user needs to manually adjust operating parameters until the desired rotational speed is reached, or until the transient are eliminated, before the linearization can be performed. This procedure is here automatized using a simple iterative algorithm. The method supports simulations with zero rotational speed, a fixed rotational speed (generator off), or simulations with a variable speed (generator on). In the later case, the algorithm presented adjusts one of the following operating parameter to reach the target rotational speed: the blade pitch angle, the generator torque or the neutral yaw position of the turbine. A proportional gain on the rotational speed error is used to adjust the parameters. To speed-up the convergence, the damping may be artificially increased in the iteration step. At the end of the iteration algorithm, the transient have dissipated, the rotor is at the target rotational speed and a steady or periodic operating point is reached. The linearization is then performed for one rotor revolution (if applicable) without the previously added damping.
+linearization about a rotational set-point in \textit{OpenFAST}. Currently, the user needs to manually adjust operating parameters until the desired rotational speed is reached, or until the transients are eliminated, before the linearization can be performed. This procedure is here automatized using a simple iterative algorithm. The method supports simulations with zero rotational speed, a fixed rotational speed (generator off), or simulations with a variable speed (generator on). In the later case, the algorithm presented adjusts one of the following operating parameter to reach the target rotational speed: the blade pitch angle, the generator torque or the neutral yaw position of the turbine. A proportional gain on the rotational speed error is used to adjust the parameters. To speed-up the convergence, the damping may be artificially increased in the iteration step. At the end of the iteration algorithm, the transients have dissipated, the rotor is at the target rotational speed and a steady or periodic operating point is reached. The linearization is then performed for one rotor revolution (if applicable) without the previously added damping.
 The algorithm is such that it only involves modifications of the \textit{OpenFAST} glue-code and of \tt{ServoDyn}.
 
 
@@ -28,7 +28,7 @@ The algorithm is such that it only involves modifications of the \textit{OpenFAS
 The basic workflow is listed below. More details follow in subsequent sections.
 \begin{itemize}\tightlist
     \item New parameters are read from the input files (given in \autoref{sec:newinputs})
-    \item If the parameter \tt{CalcSteady} is false, \textit{OpenFAST} the linearization process will happen as before (at LinTimes)
+    \item If the parameter \tt{CalcSteady} is false, the \textit{OpenFAST} linearization process will happen as before (at \tt{LinTimes})
     \item 
       If \tt{CalcSteady} is true, \textit{OpenFAST} will iterate and update a controller parameter
       until the rotational speed matches the parameter \tt{RotSpeed} given in \textit{ElastoDyn}'s input file, and then perform the linearization at this periodic operating point.
@@ -41,7 +41,7 @@ The basic workflow is listed below. More details follow in subsequent sections.
     \item \textit{ServoDyn} is initialized. The discrete-time state \tt{CtrlOffset} is added to the module to keep track of the controller parameter offset.
     \item The glue-code starts a special time stepping loop where a convergence criteria is checked upon after each revolution, or time step if the rotational speed is zero.  The time stepping loop has the following characteristics:
     \begin{itemize}\tightlist
-    \item At each time step, if the controller trimming is active, \textit{ServoDyn} updates its controller offset state (\tt{CtrlOffset}) based on the proportional gain \tt{TrimGain} and the error in rotational speed. This offset is added to the controller commands of \textit{ServoDyn} and will hence have an influence on \tt{ElastoDyn}. 
+    \item At each time step, if the controller trimming is active, \textit{ServoDyn} updates its controller offset state (\tt{CtrlOffset}) based on the proportional gain \tt{TrimGain} and the error in rotational speed. This offset is added to the controller commands of \textit{ServoDyn} and will hence have an influence on \textit{ElastoDyn}. 
     \item At each time step, the glue-code adds additional damping, via external forces, to the structure of the modules \textit{ElastoDyn} and \textit{BeamDyn}.
     \item At given azimuthal positions (defined by \tt{NAzimStep}), the glue-code computes the relative difference between the output vector of the current revolution and the previous revolution. If the rotational speed is zero, the difference is computed between two successive time steps and the number of azimuthal step is effectively 1.
     \item When this difference is below the tolerance \tt{TrimTol} for all the reference azimuthal positions, the simulation has reached a periodic steady state, which also implies that the controller offset parameter has also converged and the rotational speed of the rotor matches the requested set-point. The time-stepping is stopped
@@ -53,9 +53,10 @@ The basic workflow is listed below. More details follow in subsequent sections.
 The following sections describe the changes needed to the code:
 \begin{itemize}
     \item \autoref{sec:newinputs}: new input parameters to be added to the \textit{OpenFAST} glue-code
+    \item \autoref{sec:newEDinitoutputs}: changes to \textit{ElastoDyn} to return needed information
     \item \autoref{sec:gluecodeiterative}: iterative procedure of the glue-code to ensure a periodic steady state is reached
-    \item \autoref{sec:damping}: glue-code procedure to increase the damping and accelerate the convergence
     \item \autoref{sec:changesservodyn}: changes to \textit{ServoDyn} to compute the controller parameter offset
+    \item \autoref{sec:damping}: glue-code procedure to increase the damping and accelerate the convergence
 \end{itemize}
 
 
@@ -74,24 +75,41 @@ The following input are added to the main \textit{OpenFAST} input file (\tt{.fst
 % \end{lstlisting}
 \begin{itemize}\tightlist
     \item \tt{CalcSteady - Calculate a steady-state periodic operating point before linearization (-) (switch)}
-    \item \tt{TrimCase   - Controller parameter to be trimmed \{1:yaw; 2:torque; 3:pitch\} [used only if CalcSteady=True]}
-    \item \tt{TrimTol    - Tolerance for the rotational speed convergence [>0] [used only when CalcSteady=True] }
-    \item \tt{TrimGain    - Proportional gain for the rotational speed error (rad/(rad/s) or Nm/(rad/s)) [>0] [used only when CalcSteady=True] }
-    \item \tt{Twr\_Kdmp   - Damping factor for the tower (N/(m/s)) [>=0] [used only when CalcSteady=True] }
-    \item \tt{Bld\_Kdmp  - Damping factor for the blade (N/(m/s)) [>=0] [used only when CalcSteady=True] }
-    \item \tt{NAzimStep  - Number of equally-spaced azimuth steps in periodic linearized model (-) [>=1] }
+    \item \tt{TrimCase - Controller parameter to be trimmed \{1:yaw; 2:torque; 3:pitch\} [used only when CalcSteady=True]}
+    \item \tt{TrimTol - Tolerance for the rotational speed convergence [>eps] [used only when CalcSteady=True] }
+    \item \tt{TrimGain - Proportional gain for the rotational speed error (rad/(rad/s) or Nm/(rad/s)) [>0] [used only when CalcSteady=True] }
+    \item \tt{Twr\_Kdmp - Damping factor for the tower (N/(m/s)) [>=0] [used only when CalcSteady=True] }
+    \item \tt{Bld\_Kdmp - Damping factor for the blade (N/(m/s)) [>=0] [used only when CalcSteady=True] }
+%    \item \tt{NAzimStep  - Number of equally-spaced azimuth steps in periodic linearized model (-) [>=1] }
 \end{itemize}
+
+Note: \tt{NAzimStep} is equivalent to \tt{NLinTimes}, which is already in the \textit{OpenFAST} input file. Also note that in implementation,
+\tt{TrimTol} must be larger than epsilon. \question{or maybe we should require it to be even larger?}
+
 \question{Do we want to adjust more damping values?}
-Linearization inputs are read in \tt{Fast\_Subs.f90}, routine \tt{FAST\_ReadPrimaryFile} about line 2273. They are returned in the structure named \tt{p} or \tt{p\_FAST} of type \tt{FAST\_ParameterType}. The parameters above needs to be added to the \tt{FAST\_Registry.txt} file as \tt{FAST\_ParameterType}.
+Linearization inputs are read in \tt{Fast\_Subs.f90}, routine \tt{FAST\_ReadPrimaryFile} about line 2273. They are returned in the structure named \tt{p} or \tt{p\_FAST} of type \tt{FAST\_ParameterType}. The parameters above need to be added to the \tt{FAST\_Registry.txt} file as \tt{FAST\_ParameterType}.
 % \clearpage
 
 
 
 
 
+\subsection{New initialization outputs from \textit{ElastoDyn}}
+\label{sec:newEDinitoutputs}
 
+\paragraph{New registry types}
+The initialization outputs \tt{RotSpeed} and \tt{isFixed\_GenDOF} are added: 
+\fortran
+\begin{lstlisting}
+InitOutputType  ReKi     RotSpeed       - - - "Initial or fixed rotor speed" rad/s
+InitOutputType  Logical  isFixed_GenDOF - - - "Whether the generator DOF is fixed (true) or free (false)" -
+\end{lstlisting}
 
+These variables are sent to the initialization routine of the \textit{ServoDyn} module.
 
+Note: We can't use the \textit{ElastoDyn} output type to initialize \textit{ServoDyn} because the 
+initialization routines do not necessarily calculate output variables (the values defining the output meshes are the only
+values required to be initialized in the output type). The only exception to this is when \textit{BeamDyn} is used.
 
 
 \subsection{Main glue-code procedure}
@@ -111,7 +129,12 @@ The subscript $p$ is used to refer to the \textit{previous} time step, the subsc
 % 
 The azimuthal angle $\psi$ 
 % and the rotor speed $\Omega$ 
-at a given time step are taken from the outputs of \textit{ElastoDyn}: \tt{ED\%y\%LSSTipPxa}.
+at a given time step are taken from the outputs of \textit{ElastoDyn}: 
+\begin{align}
+    \psi = \tt{ED\%Output(1)\%LSSTipPxa}
+\end{align}
+
+
 % and \tt{ED\%y\%RotSpeed} respectively.
 % 
 % 
@@ -122,15 +145,19 @@ The following storage variables are used by the iterative algorithm:
 \begin{tabular}{ccp{10cm}}
 \textbf{Variable} & \textbf{Dimensions}& \textbf{Description}\\
 \hline
-$\v{\psi}_0$ & $1\times \tt{NAzimStep}$ & Target azimuthal positions $\v{\psi}_0$, indexed with the variable $j$ \\
-$\v{y}_c$ & $1\times n_y$ & Output vector (from all modules) at current time step \\
-$\v{y}_p$ & $1\times n_y$ & Output vector (from all modules) at previous time step \\
-$\v{y}_0$ & $1\times n_y$ & Output vector interpolated at a target azimuthal position \\
-$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector at each target azimuthal position $\psi_y$ \\
+$n_{rot}$ & $1 \times 1$ & Number of full rotor revolutions completed; if the reference rotational speed is zero, each time step is considered a full revolution.\\
+$j$ & $1 \times 1$ & Index into target azimuth positions, $j \in [1,\tt{NAzimStep}]$\\
+$n_y$ & $1 \times 1$ & Total number of outputs included in the linearization analysis of all modules, excluding any \tt{WriteOutput} and extended output values\\
+$\v{\psi}_0$ & $1\times \tt{NAzimStep}$ & Target azimuthal positions, $\v{\psi}_0[j] \in [0, 2\pi)$\\
+$\v{y}_c$ & $1\times n_y$ & Output vector (from all modules) at current time step (used for interpolation)\\
+$\v{y}_p$ & $1\times n_y$ & Output vector (from all modules) at previous time step (used for interpolation)\\
+$\v{y}_0$ & $1\times n_y$ & Output vector at a target azimuthal position, interpolated using $\v{y}_c$ and $\v{y}_p$\\
+$\m{Y}_0$ & $n_{y}\times \tt{NAzimStep}$ & Output vector interpolated at each target azimuthal position $\psi_0[j]$ (stored from previous revolution)\\
 $\v{\epsilon}_y$ & $1 \times \tt{NAzimStep}$ & Relative error in the output vector between two revolutions at the same target azimuthal position \\
 \hline
 \end{tabular}
 \end{table}
+
 
 The following steps make up the iterative procedure:
 \begin{itemize}\tightlist
@@ -159,7 +186,7 @@ The following steps make up the iterative procedure:
       For each time step:
         \begin{itemize}\tightlist
             \item Call the time step integration routine \tt{FAST\_Solution\_T}. This routine applies an increased damping (based on \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp}, see \autoref{sec:damping})
-   If the rotational speed is none zero and if the generator is on, \textit{ServoDyn} applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
+   If the rotational speed is non-zero and if the generator is on, \textit{ServoDyn} applies an offset to the controller variables (based on $\epsilon_\Omega$, see \autoref{sec:changesservodyn}).
             \item Store the current azimuthal angle and output vector: $\psi_{c}$ and $\v{y}_c$
 %             \item Store the current output vector from all the modules $\v{y}_\text{c}$
             \item If $t=0$ (or first time step):
@@ -167,15 +194,15 @@ The following steps make up the iterative procedure:
 %                     \item Set the reference rotor speed as $\Omega_\text{ref}=\Omega_c$
 %                     \item If $\Omega_\text{ref}=0$, exit the trimming algorithm
                     \item Set the initial azimuthal position as $\psi_\text{init}=\psi_c$
-                        The azimuthal angle is stored as a number in the interval $[0;\, 2\pi [$ ($2\pi$ excluded), i.e. $\psi_c=\operatorname{mod}(\psi, 2\pi)$, implemented as $\psi_c$=\tt{Zero2TwoPi($\psi$)}.
-                    \item Set the vector of target azimuthal positions $\v{\psi}_0$ (also in $[0;\,2\pi[$):
+                        The azimuthal angle is stored as a number in the interval $[0;\, 2\pi )$ ($2\pi$ excluded), i.e. $\psi_c=\operatorname{mod}(\psi, 2\pi)$, implemented as $\psi_c$=\tt{Zero2TwoPi($\psi$)}.
+                    \item Set the vector of target azimuthal positions $\v{\psi}_0$ (also in $[0;\,2\pi)$):
                             \begin{align}
                                  k=1..\tt{NAzimStep}
                                  ,\quad
                                  \v{\psi}_0[k] = \operatorname{mod}(\psi_\text{init} +  (k-1) \Delta\psi, 2\pi), \quad \Delta\psi\eqdef \frac{2\pi}{\tt{NAzimStep}}
                             \end{align}
 
-                    \item Set $\v{y}_p=\v{y}_c$ ans $\psi_p=\psi_c$
+                    \item Set $\v{y}_p=\v{y}_c$ and $\psi_p=\psi_c$
                 \end{itemize}
 %             \item Compute the error in rotor speed $\epsilon_\Omega$, the difference between the target speed and the current rotor speed:
 %                 \begin{align}
@@ -183,19 +210,23 @@ The following steps make up the iterative procedure:
 %                 \end{align}
 %                 This error will be used at the next time step to correct the controller parameter
 
-            \item If $(\psi_c -\psi_p) \geq \Delta\psi$, return an error: the rotor is spinning too fast, the time step or \tt{NazimStep} are too large
+            \item If $t >0$ and $(\psi_c -\psi_p) \geq \Delta\psi$, return an error: the rotor is spinning too fast; the time step or \tt{NazimStep} are too large.
 
-            \item If $\psi_c \geq \psi_0[j]$
+            \item If $\psi_c \geq \psi_0[j]$ (take care with the $2 \pi$ boundary)
                 \begin{itemize}
                     \item Interpolate the output vector to the target azimuthal position $\psi_0[j]$ using the current output values $\v{y}_c$ and the previous ones $\v{y}_p$:
                         \begin{align}
                             \text{if $t=0$ or $\Omega_\text{ref}=0$} , \ 
-                            \v{y}_0 = \v{y}_p,
+                            \v{y}_0 = \v{y}_c,
                             \quad \text{else}\quad 
                             \v{y}_0 = \v{y}_p + (\v{y}_c-\v{y}_p)\frac{\psi_0[j]-\psi_p}{\psi_c-\psi_p}   %\label{eq:}
                         \end{align}
-                        Note: outputs that are 3D rotations should be transformed to logarithmic maps.\\
+                        Note: outputs that are 3D rotations should be transformed to logarithmic maps.
                         Note: special care is needed if angles are close to 0 or $2\pi$, in which case they should be taken between $-\pi$ and $\pi$.
+                        Note: The output interpolations will be performed by the auto-generated routines in the FAST Registry. I am implementing this to include using the extrap-interp order
+                              used in the FAST input file. In the case that the rotational speed is zero, the extrap-interp order for the CalcSteady algorithm is changed to 0 
+                              so it will use the current value. I also modified the FAST Registry and NWTC\_Library to handle interpolation and extrapolation of angles. \\
+
                     \item If $n_\text{rot}>0$, compute the mean squared relative error of the output vector at the azimuthal position $\psi_0[j]$ between the current revolution and the previous one:
                         \begin{align}
                             \epsilon_y^2[j] %=\rVert\boldsymbol{\epsilon_y}\lVert^2
@@ -225,14 +256,17 @@ The following steps make up the iterative procedure:
                         \item If converged, exit the time loop
                         \item Otherwise, compute a reference value for each of the index of the output vector, based on the maximum and minimum values taken over one rotor revolution.
                 \begin{align}
-                    y_{\text{ref}}[i] = \max(Y_0[:,i]) - \min(Y_0[:,i])
+                    y_{\text{ref}}[i] = \left| \max(Y_0[:,i]) - \min(Y_0[:,i]) \right|
                 \quad\text{if }\
                 y_\text{ref}[i]>10^{-6}
                 ,\quad\text{else }\
                 y_\text{ref}[i]=1
                 \label{eq:yref}
-                \end{align}
-                Set $j=1$ and continue the time stepping.
+                \end{align}                
+                \begin{align}
+                \text{For angles,} \quad y_{\text{ref}}[i] = \min(\pi,y_{\text{ref}}[i])
+                \end{align}                
+                \item Set $j=1$ and continue the time stepping.
             \end{itemize}
 
     \end{itemize}
@@ -240,7 +274,7 @@ The following steps make up the iterative procedure:
 \end{itemize}
 \paragraph{Linearization}
 \begin{itemize}
-\item The values \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp} are set to 0
+% \item The values \tt{Twr\_Kdmp} and \tt{Bld\_Kdmp} are set to 0 % ignoring this due to added complication; damping should have almost no effect on the converged solution
 % \item The controller offset is kept to its value $p_\text{off}$
 \item The standard linearization procedure takes place
 \end{itemize}
@@ -261,7 +295,7 @@ The inputs \tt{RotSpeedRef}, \tt{TrimCase}, \tt{TrimGain} are added:
 \begin{lstlisting}
 InitInputType	IntKi	TrimCase	-	-	-	"Controller parameter to be trimmed"	-
 InitInputType	ReKi	TrimGain	-	-	-	"Proportional gain on rotational speed error"	-
-InitInputType	ReKi	RotSpeedRef	-	-	-	"Reference rotational speed"	rad/s??
+InitInputType	ReKi	RotSpeedRef	-	-	-	"Reference rotational speed"	rad/s
 \end{lstlisting}
 These inputs should also be added as \tt{ParameterType} in the registry file.
 %          , \qquad
@@ -280,10 +314,11 @@ The following transfer is added:
 \begin{lstlisting}
 InitInData_SrvD%TrimCase    = p_FAST%TrimCase
 InitInData_SrvD%TrimGain    = p_FAST%TrimGain
-InitInData_SrvD%RotSpeedRef = ED%Output(1)%RotSpeed
+InitInData_SrvD%RotSpeedRef = InitOutData_ED%RotSpeed
 \end{lstlisting}
-If the generator degree of freedom is off or if the rotational speed is zero, \tt{TrimCase} is set to $0$ so that the trimming is cancelled.
-
+If the generator degree of freedom is off or if the rotational speed is zero, \tt{TrimCase} is set to $0$ so that the trimming is canceled.
+Note that this is done in the glue code prior to calling \textit{ServoDyn} (because \textit{ServoDyn} does not know any DOF information from
+the structural code).
 
 
 \paragraph{Initialization routine \tt{Srvd\_Init}}
@@ -298,7 +333,7 @@ The error in rotor speed $\epsilon_\Omega$ is the difference between the target 
         \begin{align}
             \epsilon_\Omega ={\Omega_c - \Omega_\text{ref}}
         \end{align}
-The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$.
+The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$ where \tt{u} is defined at time \tt{t} (i.e., not \tt{t+1}).
         The offset on the controller variable is computed using 
         the speed error and a proportional gain $k_p>0$. The offset is computed as:
         \begin{align}
@@ -307,7 +342,7 @@ The current rotor speed is $\Omega_c=\tt{u\%RotSpeed}$.
 The variable $s$ above accounts for possible sign adjustments. 
 The offset is such that it will converge to a constant value as $\epsilon_\Omega$ tends to 0.
 When \tt{TrimCase}=1, $x_\text{off}$ is the yaw angle offset (in rad). 
-When \tt{TrimCase}=2, $x_\text{off}$ is the generator torque offset (in N). 
+When \tt{TrimCase}=2, $x_\text{off}$ is the generator torque offset (in Nm). 
 When \tt{TrimCase}=3, $x_\text{off}$ is the pitch angle offset (in rad). 
 % The offset 
 For the pitch and generator torque, $s=1$. Indeed, when the rotational speed is faster than $\Omega_\text{ref}$ ($\epsilon_\Omega>0)$, the  pitch or generator torque needs to be increased to lower the rotational speed. The opposite holds when the rotor spins slower than $\Omega_\text{ref}$.
@@ -319,9 +354,9 @@ This issue will be addressed in the next paragraph.
 The update of the discrete state is implemented as follows:
 \begin{lstlisting}
 if ((TrimCase==2).or.(TrimCase==3)) then
-    xd%CtrlOffset += (u\%RotSpeed - p%RotSpeedRef) * TrimGain 
-else if ((TrimCase==3) then
-    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * sign(TrimGain, p%YawNeutr + xd%CtrlOffset)
+    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * p%TrimGain 
+else if ((TrimCase==1) then
+    xd%CtrlOffset += (u%RotSpeed - p%RotSpeedRef) * sign(p%TrimGain, p%YawNeut + xd%CtrlOffset)
 else
     xd%CtrlOffset = 0
 endif
@@ -332,11 +367,11 @@ endif
 
 \paragraph{Output routine \tt{SrvD\_CalcOutput}}
 The output variables of \textit{ServoDyn} are directly modified using the offset \tt{CtrlOffset}.
-As mentioned in the previous paragraph, in the yaw case, the main variable outputted by \textit{ServoDyn} is the yaw moment and not the yaw angle. The part of the yaw moment that depends on the yaw angle is computed as:
+As mentioned in the previous paragraph, in the yaw case, the main variable output by \textit{ServoDyn} is the yaw moment and not the yaw angle. The part of the yaw moment that depends on the yaw angle is computed as:
 \begin{align}
     Q_\text{yaw}= - k_\text{yaw} ( \theta_\text{yaw,ED} - \theta_{\text{yaw},0})
 \end{align}
-Hence, if $\theta_{\text{yaw},0}$ is replaced by  $\theta_{\text{yaw},0}+x_\text{off}$, it is seen that the yaw moment is given the offset $k_\text{yaw} x_\text{off}$.
+Hence, if $\theta_{\text{yaw},0}$ is replaced by $\theta_{\text{yaw},0}+x_\text{off}$, it is seen that the yaw moment is given the offset $k_\text{yaw} x_\text{off}$.
 % 
 % 
 For the implementation, the control outputs are trimmed just after their computation within the  \tt{SrvD\_CalcOutput} routine, that is after calling \tt{Pitch\_CalcOutput}, \tt{Torque\_CalcOutput} and \tt{Yaw\_CalcOutput}, as follows:
@@ -362,14 +397,9 @@ It is important to note that the routines \tt{CalculateStandardYaw} and \tt{Calc
 % \weird{Torque\_CalcOutput, calls \tt{CalcuateTorque}, also called by \tt{Torque\_UpdateStates}}
 
 \paragraph{Linearization routine \tt{SrvD\_JacobianPInput}}
-This routine uses a generator torque which does not have an offset. 
-It may require the following modification:
-\begin{lstlisting}
-if (TrimCase==2)
-    GenTrq     = GenTrq      + xd%CtrlOffset
-endif
-\end{lstlisting}
-
+This routine computes the partial derivatives of outputs with respect to inputs. The \textit{ServoDyn} inputs in the linearization analysis
+include only \tt{Yaw}, \tt{YawRate}, and \tt{HSS\_Spd}. The modified output equations in \tt{SrvD\_CalcOutput} are not functions of 
+any of these variables, thus the partial derivatives are unchanged.
 
 % 
 % 
@@ -416,14 +446,15 @@ The additional damping forces can be implemented in the procedure \tt{ED\_InputS
 % % 
 For \textit{ElastoDyn}, the update of the forces 
 \begin{lstlisting}
-u%TowerPtLoads   %Force(1:3,J) -= Twr_Kdmp * y%TowerLn2Mesh   %TranslationVel(1:3,J)
+u%TowerPtLoads%Force(1:3,J) -= Twr_Kdmp * y%TowerLn2Mesh%TranslationVel(1:3,J)
 u%BladePtLoads(K)%Force(1:3,J) -= Bld_Kdmp * ( y%BladeLn2Mesh(K)%TranslationVel(1:3,J) - Vrot)
 \end{lstlisting}
 where $K$ is the blade number and $J$ is the node index (along the tower or blade, looping til \tt{NNodes}), $u$ and $y$ are the module input and outputs, and $\tt{Vrot}=\v{\Omega_c}\times\v{r}$
 is the velocity due to the rotation of the blade node, computed using \autoref{eq:Vrot}.
+
 For \textit{BeamDyn}, the additional damping is added as follows:
 \begin{lstlisting}
-u(k)%PointLoad%Force(1:3,J) -= Bld_Kdmp * (y(k)%BladeMotion%TranslationVel(1:3,J) - Vrot)
+u(k)%DistrLoad%Force(1:3,J) -= Bld_Kdmp * (y(k)%BladeMotion%TranslationVel(1:3,J) - Vrot)
 \end{lstlisting}
 
 The variable $\tt{Vrot}=\v{\Omega_c}\times\v{r}$ is computed for each blade node using
@@ -435,8 +466,10 @@ The variable $\tt{Vrot}=\v{\Omega_c}\times\v{r}$ is computed for each blade node
 \end{align}
 where $\v{r}_\text{node}$ is defined for \textit{ElastoDyn} above. It is defined in \textit{BeamDyn} as:
 \begin{align}
-    \v{r}_\text{node} &= \tt{y(k)\%BladeMotion\%Position(1:3,J)} + \tt{y(k)\%BladeMotion(K)\%TranslationDisp(1:3,J)}  \nonumber 
+    \v{r}_\text{node} &= \tt{y(k)\%BldMotion\%Position(1:3,J)} + \tt{y(k)\%BldMotion(K)\%TranslationDisp(1:3,J)}  \nonumber 
 \end{align}
+assuming that \tt{y(k)\%BldMotion} is a sibling mesh of \tt{u(k)\%DistrLoad}. In the case that these meshes are not siblings, 
+\tt{MeshMapData\%y\_BD\_BldMotion\_4Loads(k)} should be used in place of \tt{y(k)\%BldMotion}.
 
 
 % \input{APPENDIX.tex}
